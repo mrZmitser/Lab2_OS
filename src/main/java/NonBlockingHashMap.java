@@ -2,9 +2,9 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
-    private Node<K, V>[] hashTable;
+    private volatile Node<K, V>[] hashTable;
     private final int DEFAULT_SIZE = 32;
-    private int size;
+    private final int size;
     //TODO: make some fields volatile
 
     public NonBlockingHashMap(int size) {
@@ -47,11 +47,16 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
         return null;
     }
 
+    @Override
+    public V remove(Object key) {
+        //TODO: realize
+        return null;
+    }
 
     static class Node<K, V> implements Map.Entry<K, V> {
-        K key;
-        V value;
-        Node<K, V> next;
+        final K key;
+        volatile V value;
+        volatile Node<K, V> next;
         //TODO: make some fields volatile
 
         public Node(K key, V value) {

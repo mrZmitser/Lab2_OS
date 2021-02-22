@@ -1,15 +1,19 @@
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
-    private volatile Node<K, V>[] hashTable;
+    //Внимание!!! volatile-массив заменён на AtomicReferenceArray.
+    //Причина: volatile-массив не предоставляет синхронизацию
+    //для своих полей
+    private final AtomicReferenceArray<Node<K, V>> hashTable;
     private final int DEFAULT_SIZE = 32;
     private final int size;
-    //TODO: make some fields volatile
 
     public NonBlockingHashMap(int size) {
         this.size = size > 0 ? size : DEFAULT_SIZE;
-        hashTable = (Node<K, V>[]) new Node<?, ?>[size];
+        hashTable = new AtomicReferenceArray<>(this.size);
     }
 
     public NonBlockingHashMap() {
@@ -23,15 +27,23 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
 
     @Override
     public V get(Object key) {
+        var node = getNode(key);
+        return node == null ? null : node.value;
+    }
+
+    private Node<K, V> getNode(Object key) {
+        if (key == null)
+            throw new NullPointerException();
         int hash = key.hashCode() % size;
-        var node = hashTable[hash];
+        var node = hashTable.get(hash);
         while (node != null) {
             if (key.equals(node.key)) {
-                return node.value;
+                return node;
             }
             node = node.next;
         }
         return null;
+
     }
 
     @Override
@@ -43,8 +55,17 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
     public V put(K key, V value) {
         if (key == null || value == null)
             throw new NullPointerException();
-        //TODO: realize
-        return null;
+        var node = getNode(key);
+        var hash = key.hashCode() % size;
+        if (node == null) {
+            node = new Node<>(key, value, hashTable.get(hash));
+            hashTable.set(hash, node);
+            return null;
+        } else {
+            var oldValue = node.getValue();
+            node.value = value;
+            return oldValue;
+        }
     }
 
     @Override
@@ -57,7 +78,6 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
         final K key;
         volatile V value;
         volatile Node<K, V> next;
-        //TODO: make some fields volatile
 
         public Node(K key, V value) {
             this.key = key;

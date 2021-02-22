@@ -70,7 +70,14 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
 
     @Override
     public V remove(Object key) {
-        //TODO: realize
+        if (key == null)
+            throw new NullPointerException();
+        var node = getNode(key);
+        if (node != null) {
+            var value = node.getValue();
+            node = null;
+            return value;
+        }
         return null;
     }
 

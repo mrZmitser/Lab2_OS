@@ -1,12 +1,7 @@
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
-    //Внимание!!! volatile-массив заменён на AtomicReferenceArray.
-    //Причина: volatile-массив не предоставляет синхронизацию
-    //для своих полей
     private final AtomicReferenceArray<Node<K, V>> hashTable;
     private final int DEFAULT_SIZE = 32;
     private final int size;
@@ -34,7 +29,7 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
     private Node<K, V> getNode(Object key) {
         if (key == null)
             throw new NullPointerException();
-        int hash = key.hashCode() % size;
+        int hash = Math.abs((key.hashCode() % size));
         var node = hashTable.get(hash);
         while (node != null) {
             if (key.equals(node.key)) {
@@ -42,28 +37,36 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
             }
             node = node.next;
         }
+        System.out.println("hash: " + hash + "; size : " + size);
         return null;
-
-    }
-
-    @Override
-    public Set<Entry<K, V>> entrySet() {
-        throw new UnsupportedOperationException();
     }
 
     @Override
     public V put(K key, V value) {
         if (key == null || value == null)
             throw new NullPointerException();
-        var node = getNode(key);
-        var hash = key.hashCode() % size;
-        if (node == null) {
-            node = new Node<>(key, value, hashTable.get(hash));
-            hashTable.set(hash, node);
+        int hash = Math.abs((key.hashCode() % size));
+        if (hashTable.compareAndSet(hash, null, new Node<>(key, value))) {
             return null;
         } else {
-            var oldValue = node.getValue();
-            node.value = value;
+            var firstNode = hashTable.get(hash);
+            V oldValue = null;
+            synchronized (firstNode) {
+                var curNode = firstNode.next;
+                var prevNode = firstNode;
+                while (curNode != null) {
+                    if (key.equals(curNode.key)) {
+                        oldValue = curNode.value;
+                        curNode.value = value;
+                        break;
+                    }
+                    prevNode = curNode;
+                    curNode = curNode.next;
+                }
+                if (curNode == null) {
+                    prevNode.next = new Node<>(key, value);
+                }
+            }
             return oldValue;
         }
     }
@@ -75,13 +78,25 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
         var node = getNode(key);
         if (node != null) {
             var value = node.getValue();
+            // TODO: прочитай и исправь
+            // ты просто присваиваешь ссылке null, в хэш-таблице
+            // ничего при этом не изменится,
+            // надо указать, что за предыдущим (для удалённого)
+            // элементом списка теперь идёт следующий
             node = null;
             return value;
         }
         return null;
     }
 
+    @Override
+    // Attention! This operation is not supported by NonBlockingHashMap realization!
+    public Set<Entry<K, V>> entrySet() {
+        throw new UnsupportedOperationException();
+    }
+
     static class Node<K, V> implements Map.Entry<K, V> {
+
         final K key;
         volatile V value;
         volatile Node<K, V> next;
@@ -89,11 +104,6 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
         public Node(K key, V value) {
             this.key = key;
             this.value = value;
-        }
-
-        public Node(K key, V value, Node<K, V> next) {
-            this(key, value);
-            this.next = next;
         }
 
         @Override

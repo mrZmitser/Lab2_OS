@@ -29,7 +29,7 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
     @Override
     public V get(Object key) {
         var node = getNode(key);
-        return node == null ? null : node.value.get();
+        return node == null ? null : node.getValue();
     }
 
     private Node<K, V> getNode(Object key) {
@@ -51,15 +51,22 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
         if (key == null || value == null)
             throw new NullPointerException();
         int hash = Math.abs((key.hashCode() % size));
-        var node = getNode(key);
-        Node<K, V> first;
-        if (node == null) {
-            do {
-                first = hashTable.get(hash);
-            } while (!hashTable.compareAndSet(hash, first, new Node<>(key, value, first)));
+        if (hashTable.compareAndSet(hash, null, new Node<>(key, value))) {
             return null;
-        } else {
-            return node.setValue(value);
+        }
+
+        var firstNode = hashTable.get(hash);
+        synchronized (firstNode) {
+            var curNode = getNode(key);
+            if (curNode != null) {
+                return curNode.setValue(value);
+            }
+            Node<K, V> prevNode = null;
+            for (curNode = firstNode; curNode != null; curNode = curNode.next){
+                prevNode = curNode;
+            }
+            prevNode.next = new Node<>(key, value);
+            return null;
         }
     }
 
@@ -101,12 +108,7 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
 
         public Node(K key, V value) {
             this.key = key;
-            this.setValue(value);
-        }
-
-        public Node(K key, V value, Node<K, V> next) {
-            this(key, value);
-            this.next = next;
+            this.value.set(value);
         }
 
         @Override

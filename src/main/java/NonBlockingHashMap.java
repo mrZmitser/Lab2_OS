@@ -1,19 +1,23 @@
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
-    private final AtomicReferenceArray<Node<K, V>> hashTable;
+public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
+    private AtomicReferenceArray<Node<K, V>> hashTable;
     private final int DEFAULT_SIZE = 8192;
-    private final int size;
+    private int size;
 
-    public NonBlockingHashMap(int size) {
-        this.size = size > 0 ? size : DEFAULT_SIZE;
+    private void initHashTable(int size){
+        assert (size > 0);
+        this.size = size;
         hashTable = new AtomicReferenceArray<>(this.size);
     }
 
+    public NonBlockingHashMap(int size) {
+        initHashTable(size);
+    }
+
     public NonBlockingHashMap() {
-        this(-1); //to init with the DEFAULT_SIZE values
+        initHashTable(DEFAULT_SIZE);
     }
 
     @Override
@@ -102,12 +106,6 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
         return oldValue;
     }
 
-    @Override
-    // Attention! This operation is not supported by NonBlockingHashMap realization!
-    public Set<Entry<K, V>> entrySet() {
-        throw new UnsupportedOperationException();
-    }
-
     static class Node<K, V> implements Map.Entry<K, V> {
         final K key;
         volatile V value;
@@ -147,4 +145,3 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
         }
     }
 }
-

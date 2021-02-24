@@ -50,8 +50,8 @@ class NonBlockingHashMapTest {
         var testMap = initMap();
         var ints = IntStream.range(0, 100001).boxed().collect(Collectors.toList());
         ints
-                .parallelStream()
-                .forEach(k -> testMap.remove("i=" + k));
+            .parallelStream()
+            .forEach(k -> testMap.remove("i=" + k));
         for (int i = 0; i < 10000; ++i) {
             assertNull(testMap.get("i="+i));
         }

@@ -1,23 +1,30 @@
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+
+import java.util.HashMap;
+import java.util.Random;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class NonBlockingHashMapTest {
     @Test
     void containsKey() {
-        //todo
+        NonBlockingHashMap<Integer, Integer> map = new NonBlockingHashMap<>();
+        for(int i = 0; i < 100; i += 16)
+            map.put(i, i + 1);
+        map.remove(64);
+        assertFalse(map.containsKey(64));
     }
 
     @Test
     void get() {
-        //todo
+        NonBlockingHashMap<Integer, Integer> map = new NonBlockingHashMap<>();
+        for(int i = 0; i < 100; i += 16)
+            map.put(i, i + 1);
+        assertEquals(65, map.get(64));
     }
 
     @Test
@@ -34,14 +41,19 @@ class NonBlockingHashMapTest {
 
         ints
             .parallelStream()
-            .forEach(k -> {
-                map.put("i=" + k, k);
-            });
+            .forEach(k -> map.put("i=" + k, k));
         return map;
     }
 
     @Test
     void remove() {
-        //todo
+        var testMap = initMap();
+        var ints = IntStream.range(0, 100001).boxed().collect(Collectors.toList());
+        ints
+                .parallelStream()
+                .forEach(k -> testMap.remove("i=" + k));
+        for (int i = 0; i < 10000; ++i) {
+            assertNull(testMap.get("i="+i));
+        }
     }
 }

@@ -3,7 +3,7 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
     private final AtomicReferenceArray<Node<K, V>> hashTable;
-    private final int DEFAULT_SIZE = 32;
+    private final int DEFAULT_SIZE = 8192;
     private final int size;
 
     public NonBlockingHashMap(int size) {
@@ -37,7 +37,6 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
             }
             node = node.next;
         }
-        System.out.println("hash: " + hash + "; size : " + size);
         return null;
     }
 
@@ -52,8 +51,8 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
             var firstNode = hashTable.get(hash);
             V oldValue = null;
             synchronized (firstNode) {
-                var curNode = firstNode.next;
-                var prevNode = firstNode;
+                var curNode = firstNode;
+                Node<K, V> prevNode = null;
                 while (curNode != null) {
                     if (key.equals(curNode.key)) {
                         oldValue = curNode.value;
@@ -75,18 +74,31 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
     public V remove(Object key) {
         if (key == null)
             throw new NullPointerException();
-        var node = getNode(key);
-        if (node != null) {
-            var value = node.getValue();
-            // TODO: прочитай и исправь
-            // ты просто присваиваешь ссылке null, в хэш-таблице
-            // ничего при этом не изменится,
-            // надо указать, что за предыдущим (для удалённого)
-            // элементом списка теперь идёт следующий
-            node = null;
-            return value;
+        int hash = Math.abs((key.hashCode() % size));
+        var firstNode
+                = hashTable.get(hash);
+        V oldValue = null;
+        synchronized (firstNode) {
+            var curNode = firstNode;
+            Node<K, V> prevNode = null;
+            while (curNode != null) {
+                if (key.equals(curNode.key)) {
+                    oldValue = curNode.value;
+                    if (prevNode != null) {
+                        if (curNode.next != null)
+                            prevNode.next = curNode.next;
+                        else
+                            prevNode.next = null;
+                    } else {
+                        hashTable.set(hash, curNode.next);
+                    }
+                    break;
+                }
+                prevNode = curNode;
+                curNode = curNode.next;
+            }
         }
-        return null;
+        return oldValue;
     }
 
     @Override
@@ -96,7 +108,6 @@ public class NonBlockingHashMap<K, V> extends AbstractMap<K, V> {
     }
 
     static class Node<K, V> implements Map.Entry<K, V> {
-
         final K key;
         volatile V value;
         volatile Node<K, V> next;

@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
@@ -6,7 +7,7 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
     private final int DEFAULT_SIZE = 8192;
     private int size;
 
-    private void initHashTable(int size){
+    private void initHashTable(int size) {
         assert (size > 0);
         this.size = size;
         hashTable = new AtomicReferenceArray<>(this.size);
@@ -28,7 +29,7 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
     @Override
     public V get(Object key) {
         var node = getNode(key);
-        return node == null ? null : node.value;
+        return node == null ? null : node.value.get();
     }
 
     private Node<K, V> getNode(Object key) {
@@ -50,28 +51,15 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
         if (key == null || value == null)
             throw new NullPointerException();
         int hash = Math.abs((key.hashCode() % size));
-        if (hashTable.compareAndSet(hash, null, new Node<>(key, value))) {
+        var node = getNode(key);
+        Node<K, V> first;
+        if (node == null) {
+            do {
+                first = hashTable.get(hash);
+            } while (!hashTable.compareAndSet(hash, first, new Node<>(key, value, first)));
             return null;
         } else {
-            var firstNode = hashTable.get(hash);
-            V oldValue = null;
-            synchronized (firstNode) {
-                var curNode = firstNode;
-                Node<K, V> prevNode = null;
-                while (curNode != null) {
-                    if (key.equals(curNode.key)) {
-                        oldValue = curNode.value;
-                        curNode.value = value;
-                        break;
-                    }
-                    prevNode = curNode;
-                    curNode = curNode.next;
-                }
-                if (curNode == null) {
-                    prevNode.next = new Node<>(key, value);
-                }
-            }
-            return oldValue;
+            return node.setValue(value);
         }
     }
 
@@ -88,7 +76,7 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
             Node<K, V> prevNode = null;
             while (curNode != null) {
                 if (key.equals(curNode.key)) {
-                    oldValue = curNode.value;
+                    oldValue = curNode.getValue();
                     if (prevNode != null) {
                         if (curNode.next != null)
                             prevNode.next = curNode.next;
@@ -108,12 +96,17 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
 
     static class Node<K, V> implements Map.Entry<K, V> {
         final K key;
-        volatile V value;
+        AtomicReference<V> value = new AtomicReference<>(null);
         volatile Node<K, V> next;
 
         public Node(K key, V value) {
             this.key = key;
-            this.value = value;
+            this.setValue(value);
+        }
+
+        public Node(K key, V value, Node<K, V> next) {
+            this(key, value);
+            this.next = next;
         }
 
         @Override
@@ -123,12 +116,12 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
 
         @Override
         public V getValue() {
-            return value;
+            return value.get();
         }
 
         @Override
         public V setValue(V value) {
-            throw new UnsupportedOperationException();
+            return this.value.getAndSet(value);
         }
 
         @Override

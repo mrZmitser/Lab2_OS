@@ -1,13 +1,38 @@
 import org.junit.jupiter.api.Test;
 
-
-import java.util.HashMap;
 import java.util.Random;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+
+class TestThread extends Thread {
+    Random random;
+    int size = 1000;
+    private NonBlockingHashMap<Integer, Integer> map;
+
+    public NonBlockingHashMap<Integer, Integer> getMap() {
+        return map;
+    }
+
+    public void setMap(NonBlockingHashMap<Integer, Integer> map) {
+        this.map = map;
+    }
+
+    public TestThread() {
+        map = new NonBlockingHashMap<>();
+        random = new Random();
+    }
+
+    @Override
+    public void run() {
+        for(int i = 0; i < size / 2; i++)
+        {
+            map.put(random.nextInt() % 200, random.nextInt());
+            map.remove(random.nextInt() % 200, random.nextInt());
+        }
+    }
+}
 
 class NonBlockingHashMapTest {
     @Test
@@ -43,6 +68,23 @@ class NonBlockingHashMapTest {
             .parallelStream()
             .forEach(k -> map.put("i=" + k, k));
         return map;
+    }
+
+    @Test
+    void crushTest(){
+        NonBlockingHashMap map = new NonBlockingHashMap();
+        TestThread thread1 = new TestThread();
+        TestThread thread2 = new TestThread();
+        thread1.setMap(map);
+        thread2.setMap(map);
+        thread1.start();
+        thread2.start();
+        try {
+            thread1.join(0);
+            thread2.join(0);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     @Test

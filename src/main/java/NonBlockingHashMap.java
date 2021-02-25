@@ -75,30 +75,22 @@ public class NonBlockingHashMap<K, V> extends HashMap<K, V> {
         if (key == null)
             throw new NullPointerException();
         int hash = Math.abs((key.hashCode() % size));
-        var firstNode
-                = hashTable.get(hash);
-        V oldValue = null;
+        var firstNode = hashTable.get(hash);
         synchronized (firstNode) {
             var curNode = firstNode;
             Node<K, V> prevNode = null;
-            while (curNode != null) {
-                if (key.equals(curNode.key)) {
-                    oldValue = curNode.getValue();
-                    if (prevNode != null) {
-                        if (curNode.next != null)
-                            prevNode.next = curNode.next;
-                        else
-                            prevNode.next = null;
-                    } else {
-                        hashTable.set(hash, curNode.next);
-                    }
+            for (; curNode != null; curNode = curNode.next) {
+                if (key.equals(curNode.getKey())){
                     break;
                 }
                 prevNode = curNode;
-                curNode = curNode.next;
             }
+            if(curNode == null) return null;
+            if (prevNode != null){
+                prevNode.next = curNode.next;
+            }
+            return curNode.setValue(null);
         }
-        return oldValue;
     }
 
     static class Node<K, V> implements Map.Entry<K, V> {

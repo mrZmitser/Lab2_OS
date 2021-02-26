@@ -1,44 +1,17 @@
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class TestThread extends Thread {
-    Random random;
-    int size = 1000;
-    private NonBlockingHashMap<Integer, Integer> map;
-
-    public NonBlockingHashMap<Integer, Integer> getMap() {
-        return map;
-    }
-
-    public void setMap(NonBlockingHashMap<Integer, Integer> map) {
-        this.map = map;
-    }
-
-    public TestThread() {
-        map = new NonBlockingHashMap<>();
-        random = new Random();
-    }
-
-    @Override
-    public void run() {
-        for(int i = 0; i < size / 2; i++)
-        {
-            map.put(random.nextInt() % 200, random.nextInt());
-            map.remove(random.nextInt() % 200, random.nextInt());
-        }
-    }
-}
-
 class NonBlockingHashMapTest {
     @Test
     void containsKey() {
         NonBlockingHashMap<Integer, Integer> map = new NonBlockingHashMap<>();
-        for(int i = 0; i < 100; i += 16)
+        for (int i = 0; i < 100; i += 16)
             map.put(i, i + 1);
         map.remove(64);
         assertFalse(map.containsKey(64));
@@ -47,7 +20,7 @@ class NonBlockingHashMapTest {
     @Test
     void get() {
         NonBlockingHashMap<Integer, Integer> map = new NonBlockingHashMap<>();
-        for(int i = 0; i < 100; i += 16)
+        for (int i = 0; i < 100; i += 16)
             map.put(i, i + 1);
         assertEquals(65, map.get(64));
     }
@@ -71,12 +44,21 @@ class NonBlockingHashMapTest {
     }
 
     @Test
-    void crushTest(){
-        NonBlockingHashMap map = new NonBlockingHashMap();
-        TestThread thread1 = new TestThread();
-        TestThread thread2 = new TestThread();
-        thread1.setMap(map);
-        thread2.setMap(map);
+    void crushTest() {
+        var map = new NonBlockingHashMap<Integer, Integer>();
+        Random random = new Random();
+        Thread thread1 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                map.put(2*(random.nextInt() % 200), random.nextInt());
+                map.remove(2*(random.nextInt() % 200) + 1, random.nextInt());
+            }
+        });
+        Thread thread2 = new Thread(() -> {
+            for (int i = 0; i < 1000; i++) {
+                map.put(2*(random.nextInt() % 200) + 1, random.nextInt());
+                map.remove(2*(random.nextInt() % 200), random.nextInt());
+            }
+        });
         thread1.start();
         thread2.start();
         try {
@@ -95,7 +77,7 @@ class NonBlockingHashMapTest {
             .parallelStream()
             .forEach(k -> testMap.remove("i=" + k));
         for (int i = 0; i < 10000; ++i) {
-            assertNull(testMap.get("i="+i));
+            assertNull(testMap.get("i=" + i));
         }
     }
 }

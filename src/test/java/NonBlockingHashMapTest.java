@@ -28,18 +28,18 @@ class NonBlockingHashMapTest {
     @Test
     void put() {
         var testMap = initMap();
-        for (int i = 0; i < 10000; ++i) {
+        for (int i = 0; i < 10001; ++i) {
             assertEquals(i, testMap.get("i=" + i));
         }
     }
 
     private NonBlockingHashMap<String, Integer> initMap() {
         var map = new NonBlockingHashMap<String, Integer>();
-        var ints = IntStream.range(0, 100001).boxed().collect(Collectors.toList());
+        var ints = IntStream.range(0, 10001).boxed().collect(Collectors.toList());
 
         ints
-            .parallelStream()
-            .forEach(k -> map.put("i=" + k, k));
+                .parallelStream()
+                .forEach(k -> map.put("i=" + k, k));
         return map;
     }
 
@@ -50,13 +50,13 @@ class NonBlockingHashMapTest {
         Thread thread1 = new Thread(() -> {
             for (int i = 0; i < 1000; i++) {
                 map.put(2*(random.nextInt() % 200), random.nextInt());
-                map.remove(2*(random.nextInt() % 200) + 1, random.nextInt());
+                map.remove(2*(random.nextInt() % 200) + 1);
             }
         });
         Thread thread2 = new Thread(() -> {
             for (int i = 0; i < 1000; i++) {
                 map.put(2*(random.nextInt() % 200) + 1, random.nextInt());
-                map.remove(2*(random.nextInt() % 200), random.nextInt());
+                map.remove(2*(random.nextInt() % 200));
             }
         });
         thread1.start();
@@ -72,11 +72,11 @@ class NonBlockingHashMapTest {
     @Test
     void remove() {
         var testMap = initMap();
-        var ints = IntStream.range(0, 100001).boxed().collect(Collectors.toList());
+        var ints = IntStream.range(0, 10001).boxed().collect(Collectors.toList());
         ints
-            .parallelStream()
-            .forEach(k -> testMap.remove("i=" + k));
-        for (int i = 0; i < 10000; ++i) {
+                .parallelStream()
+                .forEach(k -> testMap.remove("i=" + k));
+        for (int i = 0; i < 10001; ++i) {
             assertNull(testMap.get("i=" + i));
         }
     }

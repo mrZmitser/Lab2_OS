@@ -31,12 +31,12 @@ public class NonBlockingHashMap<K, V> {
         return modifiedMap.get(key);
     }
 
-    public V remove(K key) {
-        //TODO: rewrite
-        var modifiedMap = new HashMap<>(arMap.get());
-        var oldValue = modifiedMap.remove(key);
-        //update(modifiedMap);
-        return oldValue;
+    public void remove(K key) {
+        update(map -> {
+            var updated = new HashMap<>(map);
+            updated.remove(key);
+            return updated;
+        });
     }
 
     public boolean containsKey(K key) {
